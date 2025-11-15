@@ -1,0 +1,200 @@
+# LoRA Fine-tuning for Large Language Models
+
+This repository contains a complete pipeline for fine-tuning large language models using LoRA (Low-Rank Adaptation) with 4-bit quantization for efficient training on consumer GPUs.
+
+## Features
+
+- **4-bit Quantization**: Reduces memory usage significantly using BitsAndBytes
+- **LoRA Adapters**: Efficient fine-tuning with minimal trainable parameters
+- **Gradient Accumulation**: Simulate larger batch sizes on limited hardware
+- **Mixed Precision Training**: FP16 for faster training
+- **Inference Pipeline**: Ready-to-use inference code with the fine-tuned model
+
+## Requirements
+
+```bash
+pip install torch transformers peft trl datasets accelerate bitsandbytes tensorboard
+```
+
+### Hardware Requirements
+
+- **Minimum**: 16GB GPU RAM (e.g., Tesla T4, RTX 4060 Ti)
+- **Recommended**: 24GB+ GPU RAM (e.g., RTX 3090, RTX 4090)
+- **CPU Fallback**: Possible but extremely slow
+
+## Quick Start
+
+### 1. Prepare Your Dataset
+
+Your dataset should be in HuggingFace format with a text field. Example:
+
+```python
+dataset = load_dataset("your_dataset_name")
+# or
+dataset = load_dataset("json", data_files="your_data.json")
+```
+
+Dataset format:
+```json
+{"text": "Your training text here..."}
+{"text": "Another training example..."}
+```
+
+### 2. Configure the Script
+
+Edit the following variables in the script:
+
+```python
+# Line 12: Replace with your dataset
+dataset = load_dataset("your_dataset_name")
+
+# Line 24: Replace with your base model
+model_name_or_path = "meta-llama/Llama-2-7b-hf"
+
+# Line 71: Match your dataset's text column
+dataset_text_field="text"
+```
+
+### 3. Run Training
+
+```bash
+python lora_finetuning.py
+```
+
+### 4. Monitor Training
+
+```bash
+tensorboard --logdir=./lora_finetuned_model
+```
+
+## Configuration
+
+### LoRA Parameters
+
+```python
+lora_config = LoraConfig(
+    r=8,                    # Rank (higher = more parameters)
+    lora_alpha=32,          # Scaling factor
+    lora_dropout=0.1,       # Dropout rate
+    target_modules=[...],   # Layers to apply LoRA
+)
+```
+
+### Training Parameters
+
+```python
+training_args = TrainingArguments(
+    num_train_epochs=3,                    # Number of epochs
+    per_device_train_batch_size=1,         # Batch size per GPU
+    gradient_accumulation_steps=4,         # Effective batch = 1*4 = 4
+    learning_rate=2e-4,                    # Learning rate
+    max_seq_length=512,                    # Max sequence length
+)
+```
+
+### Inference Parameters
+
+```python
+outputs = model.generate(
+    max_new_tokens=256,        # Length of generation
+    temperature=0.7,           # Creativity (0.1-1.0)
+    top_p=0.9,                 # Nucleus sampling
+    do_sample=True,            # Enable sampling
+)
+```
+
+## Output Structure
+
+```
+./lora_finetuned_model/
+├── checkpoint-200/          # Saved every 200 steps
+├── checkpoint-400/
+├── final/                   # Final trained model
+│   ├── adapter_config.json
+│   ├── adapter_model.bin
+│   └── tokenizer files
+└── runs/                    # TensorBoard logs
+```
+
+## Memory Optimization Tips
+
+If you run out of memory:
+
+1. **Reduce batch size**: Set `per_device_train_batch_size=1`
+2. **Increase gradient accumulation**: Set `gradient_accumulation_steps=8`
+3. **Reduce sequence length**: Set `max_seq_length=256`
+4. **Lower LoRA rank**: Set `r=4` in LoraConfig
+5. **Enable gradient checkpointing**: Add `gradient_checkpointing=True`
+
+## Inference Only
+
+To run inference without training, comment out the training section and use:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+
+# Load base model
+base_model = AutoModelForCausalLM.from_pretrained("base_model_name")
+
+# Load LoRA adapter
+model = PeftModel.from_pretrained(base_model, "./lora_finetuned_model/final")
+tokenizer = AutoTokenizer.from_pretrained("./lora_finetuned_model/final")
+
+# Generate
+inputs = tokenizer("Your prompt", return_tensors="pt")
+outputs = model.generate(**inputs, max_new_tokens=256)
+print(tokenizer.decode(outputs[0]))
+```
+
+## Supported Models
+
+This script works with most decoder-only models:
+
+- Llama 2/3
+- Mistral
+- Phi
+- GPT-2/Neo/J
+- OPT
+- Falcon
+
+Adjust `target_modules` based on your model architecture.
+
+## Troubleshooting
+
+### CUDA Out of Memory
+- Reduce `per_device_train_batch_size` to 1
+- Increase `gradient_accumulation_steps`
+- Reduce `max_seq_length`
+
+### Slow Training
+- Enable `group_by_length=True` (already enabled)
+- Use `fp16=True` (already enabled)
+- Increase batch size if memory allows
+
+### Poor Results
+- Increase training epochs
+- Adjust learning rate (try 1e-4 or 5e-5)
+- Increase LoRA rank (`r=16` or `r=32`)
+- Use more training data
+
+## Citation
+
+```bibtex
+@article{hu2021lora,
+  title={LoRA: Low-Rank Adaptation of Large Language Models},
+  author={Hu, Edward J and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
+  journal={arXiv preprint arXiv:2106.09685},
+  year={2021}
+}
+```
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Acknowledgments
+
+- HuggingFace Transformers & PEFT
+- TRL (Transformer Reinforcement Learning)
+- BitsAndBytes for quantization
