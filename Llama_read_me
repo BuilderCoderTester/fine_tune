@@ -1,0 +1,148 @@
+# Fine-tuning Llama 2 with QLoRA
+
+## 📋 Overview
+
+This project demonstrates fine-tuning the **Llama-2-7b-chat-hf** model using **QLoRA (Quantized Low-Rank Adaptation)** on the OpenAssistant Guanaco dataset. The implementation leverages 4-bit quantization to enable efficient training on limited GPU resources (Tesla T4 with 16GB VRAM).
+
+## 🎯 Key Features
+
+- **Model**: NousResearch/Llama-2-7b-chat-hf (7 billion parameters)
+- **Dataset**: timdettmers/openassistant-guanaco (9,846 training samples)
+- **Technique**: QLoRA with 4-bit quantization
+- **Hardware**: NVIDIA Tesla T4 GPU
+- **Training Time**: ~3 hours for 1 epoch
+
+## 🛠️ Technologies Used
+
+- **Transformers** - Hugging Face model loading and training
+- **PEFT** - Parameter-Efficient Fine-Tuning with LoRA
+- **BitsAndBytes** - 4-bit quantization for memory efficiency
+- **TRL** - Supervised Fine-Tuning Trainer
+- **PyTorch** - Deep learning framework
+
+## ⚙️ Configuration
+
+### Quantization Settings
+```python
+- 4-bit quantization (NF4)
+- FP16 compute dtype
+- Double quantization enabled
+```
+
+### LoRA Parameters
+```python
+- LoRA rank (r): 8
+- Alpha: 16
+- Target modules: q_proj, v_proj
+- Dropout: 0.05
+```
+
+### Training Hyperparameters
+```python
+- Epochs: 1
+- Batch size: 1 per device
+- Gradient accumulation: 4 steps
+- Learning rate: 2e-4
+- Optimizer: AdamW
+- LR scheduler: Cosine
+- Max sequence length: 512
+```
+
+## 📊 Training Results
+
+- **Final Training Loss**: 1.312
+- **Mean Token Accuracy**: 67.1%
+- **Total Training Steps**: 2,462
+- **Training Samples/Second**: 0.889
+
+## 🚀 Usage
+
+### 1. Install Dependencies
+```python
+!pip install transformers peft trl bitsandbytes
+```
+
+### 2. Load Fine-tuned Model
+```python
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel
+
+base_model = "NousResearch/Llama-2-7b-chat-hf"
+lora_path = "/path/to/qlora_model"
+
+tokenizer = AutoTokenizer.from_pretrained(lora_path)
+model = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto")
+model = PeftModel.from_pretrained(model, lora_path)
+```
+
+### 3. Generate Text
+```python
+prompt = "Your question here"
+inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+
+output = model.generate(**inputs, max_new_tokens=200, temperature=0.7)
+print(tokenizer.decode(output[0], skip_special_tokens=True))
+```
+
+## 📦 Model Artifacts
+
+The fine-tuned model includes:
+- LoRA adapter weights (`adapter_model.safetensors`)
+- Tokenizer files
+- Configuration files
+- Training metadata
+
+## 💾 Memory Optimization
+
+**4-bit quantization** reduces the model size from ~13.5GB to ~3.5GB, making it feasible to:
+- Train on consumer GPUs
+- Deploy on resource-constrained environments
+- Maintain competitive performance
+
+## 📈 Training Loss Progression
+
+| Step | Loss   |
+|------|--------|
+| 50   | 1.684  |
+| 500  | 1.303  |
+| 1000 | 1.296  |
+| 1500 | 1.364  |
+| 2000 | 1.250  |
+| 2462 | 1.312  |
+
+## 🔍 Use Cases
+
+This fine-tuned model is optimized for:
+- Conversational AI applications
+- Question-answering systems
+- Instruction following tasks
+- Educational content generation
+
+## ⚠️ Hardware Requirements
+
+- **Minimum**: 16GB GPU VRAM (Tesla T4, RTX 3090, etc.)
+- **Recommended**: 24GB+ GPU VRAM for faster training
+- **CPU RAM**: 32GB+
+
+## 📝 Notes
+
+- The model uses the Llama 2 chat template format
+- Training was performed with gradient checkpointing for memory efficiency
+- FP16 mixed precision training was enabled for speed optimization
+- The dataset was preprocessed to match Llama 2's instruction format
+
+## 🤝 Acknowledgments
+
+- **Dataset**: [OpenAssistant Guanaco](https://huggingface.co/datasets/timdettmers/openassistant-guanaco)
+- **Base Model**: [NousResearch Llama-2-7b-chat-hf](https://huggingface.co/NousResearch/Llama-2-7b-chat-hf)
+- **QLoRA Paper**: [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314)
+
+## 📄 License
+
+This project follows the Llama 2 Community License. Please review the license terms before commercial use.
+
+---
+
+**Author**: Anurag Sarkar  
+**Platform**: Kaggle  
+**Last Updated**: November 2025
